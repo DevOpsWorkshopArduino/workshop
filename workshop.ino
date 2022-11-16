@@ -14,15 +14,15 @@ DynamicJsonDocument jsonObject(2048);
 
 const char* ssid = "duohotspot";     // Vul hier jouw eigen netwerknaam (ssid) in
 const char* password = "workshop";  // Vul hier jouw eigen netwerkwachtwoord in
-const String server = "api.coindesk.com"; // Het adres van de server
-const String url = "/v1/bpi/currentprice.json"; // De url waar de informatie te vinden is
-
+const String server = "workshopduo.am0.nl"; // Het adres van de server
+const String urlDatum = "/?type=datum"; // De url waar de informatie te vinden is
+const String urlTijd = "/?type=tijd"; // De url waar de informatie te vinden is
 
 int huidig_scherm = 0;
 int aantal_schermen = 2;
 bool button_pressed = false;
-int counter = 0;
-float huidigePrijs;
+String datum;
+String tijd;
 
 void setup() {
   Serial.begin(9600);
@@ -31,10 +31,7 @@ void setup() {
     for (;;)
       ;
   }
-
-  printPaginaNul(huidig_scherm);
   maakVerbindingMetWifi();
-  doeApiCalls();
 }
 
 // Deze functie maakt verbinding met het netwerk
@@ -57,32 +54,32 @@ void clearDisplay() {
   display.setTextColor(WHITE);
 }
 
-void printPaginaNul(int input) {
+void printPaginaDatum(String input) {
   clearDisplay();
-  display.printf("Hello pagina nul: %d", input);
+  display.printf("Datum: %s", input);
   // Laat hetgeen we getekend hebben zien op het scherm
   display.display();
 }
 
-void printPaginaEen() {
+void printPaginaTijd(String input) {
   clearDisplay();
-  display.println("Hello pagina een");
+  display.printf("Tijd: %s", input);
   // Laat hetgeen we getekend hebben zien op het scherm
   display.display();
 }
 
-void doeApiCalls() {
+void doeApiCalls(String url) {
   display.clearDisplay();                 // Maak het scherm leeg
   display.setTextSize(1);                 // Zet het tekstformaat op 1
   display.setCursor(0, 0);                // Begin met schrijven op positie 0,0 (links boven)
   // Uitvoeren als er een verbinding gemaakt is met de server
   if (client.connect(server, 443)) {
-    display.print("Verbonden met server");                 // Schrijf tekst naar het scherm
+    display.print("Gegevens ophalen...");                 // Schrijf tekst naar het scherm
     // Uitvoeren als er een fout is opgetreden
   } else {
     display.print("Kan geen verbinding maken met server"); // Schrijf tekst naar het scherm
   }
-  display.display(); 
+  display.display();
   // Toon de tekst op het scherm
   client.println("GET https://" + server + url + " HTTP/1.0");
   client.println("Host: " + server);
@@ -100,29 +97,29 @@ void doeApiCalls() {
   deserializeJson(jsonObject, gegevens);  // De gegevens omzetten naar een JSON object
   // De huidige prijs uitlezen
   Serial.println(gegevens);
-  huidigePrijs = jsonObject["bpi"]["EUR"]["rate_float"].as<float>();
-  Serial.println(huidigePrijs);
+  if (url == urlDatum) {
+    datum = jsonObject["datum"].as<String>();
+  } else {
+    String uren = jsonObject["tijd"]["uren"].as<String>();
+    String minuten = jsonObject["tijd"]["minuten"].as<String>();
+    tijd = uren + ":" + minuten;
+  }
   client.stop();
 }
 
 void loop() {
-
   if (digitalRead(D3) == LOW && !button_pressed) {
     huidig_scherm = (huidig_scherm + 1) % aantal_schermen;
     button_pressed = true;
+
+    if (huidig_scherm == 1) {
+      doeApiCalls(urlDatum);
+      printPaginaDatum(datum);
+    } else {
+      doeApiCalls(urlTijd);
+      printPaginaTijd(tijd);
+    }
   } else if (digitalRead(D3) == HIGH) {
     button_pressed = false;
   }
-
-  if (huidig_scherm == 1) {
-    printPaginaEen();
-  } else {
-    printPaginaNul(huidigePrijs);
-  }
-
-  if (counter > 10000) {
-    counter = 0;
-    doeApiCalls();
-  }
-  counter = counter + 1;
 }
